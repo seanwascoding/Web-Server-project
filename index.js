@@ -1,9 +1,9 @@
 const express = require('express');
 const multer = require('multer');
-const net = require('net')
 const bodyParser = require('body-parser');
 const mysql = require('mysql2');
 const SocketServer = require('ws');
+const fs = require('fs')
 const app = express();
 
 /**  setup  */
@@ -14,26 +14,27 @@ const server = app.listen(PORT, () => console.log(`Web server is listening on po
 
 //* websocket
 const keywords = new Map();
+const map_name = new Map();
 const wss = new SocketServer.Server({ server })
 wss.on('connection', function connection(ws) {
     //? console.log('working connected', keywords.size)
     keywords.set(ws, "")
-    //? console.log(keywords.size)
+    console.log("working connected")
     ws.send("working connected from server")
 
     //! 處理 WebSocket 的事件
     ws.on('message', (message) => {
         const message_temp = JSON.parse(message)
         console.log('Received message:', message_temp)
-
+        //! create room
         if (Object.keys(message_temp)[0] == '0') {
             console.log("user create keywords")
             keywords.set(ws, message_temp[Object.keys(message_temp)[0]])
             console.log('result:', keywords.get(ws))
             // ws.send("Working Create the keywords")
         }
+        //! connecting
         else if (Object.keys(message_temp)[0] == '1') {
-            //! 在這裡處理接收到的訊息
             wss.clients.forEach((client) => {
                 if (client !== ws && client.readyState === SocketServer.OPEN) {
                     if (message_temp[Object.keys(message_temp)[0]] == keywords.get(client)) {
@@ -55,22 +56,59 @@ wss.on('connection', function connection(ws) {
                 }
             });
         }
+        //! send picture
+        else if (Object.keys(message_temp)[0] == '2') {
+            try {
+                photoData = fs.readFileSync('./image/image/test.png');
+                keywords.get(ws).send(photoData)
+                fs.unlinkSync('./image/image/test.png');
+                ws.send("sending work")
+            } catch (err) {
+                console.log(err)
+                fs.unlinkSync('./image/image/test.png');
+                ws.send("not work")
+            }
+        }
+        else if (Object.keys(message_temp)[0] == '3') {
+            let name_temp = message_temp['3']
+            map_name.set(ws, name_temp)
+            console.log(map_name.size)
+            ws.send("working to send name")
+        }
+        //! exception
         else {
             console.log("connect fail")
         }
     });
 
+    //! disconnected
     ws.on('close', () => {
         console.log('WebSocket disconnected');
-        // console.log(keywords)
+        //?
         try {
             const temp = keywords.get(ws)
             temp.send("disconnected")
         } catch (error) {
-            console.log("error:", error)
+            // console.log("error:", error)
+            console.log("not exist pair")
         }
         keywords.delete(ws)
-        // console.log(keywords)
+
+        //?
+        try {
+            let delete_name = map_name.get(ws)
+            // console.log(delete_name)
+            //? 更新 is_active 为 false
+            pool.query('UPDATE account SET is_active = ? WHERE username = ?', [false, delete_name], function (err, updateResult) {
+                if (err) {
+                    console.error('Error updating is_active: ', err);
+                }
+                console.log("is_active updated successfully");
+            });
+        } catch (err) {
+            console.log("error:", err)
+        }
+        map_name.delete(ws)
     });
 })
 
@@ -93,17 +131,27 @@ app.post('/login', (req, res) => {
     const name = Object.keys(req.body)[0]
     const password = req.body[name]
     //! 先檢查使用者名稱是否已存在
-    pool.query('SELECT * FROM account WHERE username = ? AND password = ?', [name, password], function (err, results) {
+    pool.query('SELECT * FROM account WHERE username = ? AND password = ? AND is_active = ?', [name, password, false], function (err, results) {
         if (err) {
             console.error('Error executing query: ', err);
             res.send('Error checking username');
             return;
         }
+        //! 使用者名稱已存在
         if (results.length > 0) {
-            //! 使用者名稱已存在
+
             console.log("login successfully");
-            res.send('login successfully');
-            return;
+            //? 更新 is_active 为 true
+            pool.query('UPDATE account SET is_active = ? WHERE username = ?', [true, name], function (err, updateResult) {
+                if (err) {
+                    console.error('Error updating is_active: ', err);
+                    res.send('Error updating is_active');
+                    return;
+                }
+                console.log("is_active updated successfully");
+                res.send('login successfully');
+                return;
+            });
         }
         else {
             //! 使用者名稱不存在 or 密碼打錯
@@ -140,9 +188,17 @@ app.post('/registe', (req, res) => {
                     res.status(500).send('Error inserting data into database');
                     return;
                 }
-                //! working
-                console.log('working to create');
-                res.send('working to create');
+                //! 更新 is_active 为 true
+                pool.query('UPDATE account SET is_active = ? WHERE username = ?', [true, name], function (err, updateResult) {
+                    if (err) {
+                        console.error('Error updating is_active: ', err);
+                        res.send('Error updating is_active');
+                        return;
+                    }
+                    console.log('working to create');
+                    res.send('working to create');
+                    return;
+                });
             });
             return;
         }
@@ -248,21 +304,21 @@ function catch_signal(name) {
 }
 
 //* identify connect matlab
-const client = net.createConnection({ port: 65500 }, () => {
-    // 連接成功
-    console.log('Working to connect matlab');
-    client.on('data', (data) => {
-        console.log(`接收到 Matlab 數據：${data}`);
-        if (data == 1) {
-            filePath = 'C:/Users/Sean/Desktop/vscode/project/image/gray/';
-        } else if (data == 2) {
-            filePath = 'C:/Users/Sean/Desktop/vscode/project/image/encryption/';
-        } else if (data == 3) {
-            filePath = 'C:/Users/Sean/Desktop/vscode/project/image/decrypt/';
-        } else if (data == 4) {
-            filePath = 'C:/Users/Sean/Desktop/vscode/project/image2/encryption/'
-        } else if (data == 5) {
-            filePath = 'C:/Users/Sean/Desktop/vscode/project/image2/decrypt/'
-        }
-    });
-});
+// const client = net.createConnection({ port: 65500 }, () => {
+//     // 連接成功
+//     console.log('Working to connect matlab');
+//     client.on('data', (data) => {
+//         console.log(`接收到 Matlab 數據：${data}`);
+//         if (data == 1) {
+//             filePath = 'C:/Users/Sean/Desktop/vscode/project/image/gray/';
+//         } else if (data == 2) {
+//             filePath = 'C:/Users/Sean/Desktop/vscode/project/image/encryption/';
+//         } else if (data == 3) {
+//             filePath = 'C:/Users/Sean/Desktop/vscode/project/image/decrypt/';
+//         } else if (data == 4) {
+//             filePath = 'C:/Users/Sean/Desktop/vscode/project/image2/encryption/'
+//         } else if (data == 5) {
+//             filePath = 'C:/Users/Sean/Desktop/vscode/project/image2/decrypt/'
+//         }
+//     });
+// });
