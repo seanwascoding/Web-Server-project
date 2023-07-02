@@ -48,6 +48,9 @@ wss.on('connection', function connection(ws) {
                     else if (ws === keywords.get(client) && keywords.get(ws) === client) {
                         client.send(message_temp[Object.keys(message_temp)[0]])
                     }
+                    else if(keywords.get(ws) !=""){
+                        //? jump
+                    }
                     else {
                         ws.send("error keywords")
                     }
@@ -97,7 +100,7 @@ wss.on('connection', function connection(ws) {
 
         //?
         try {
-            let delete_name = map_name.get(ws)
+            const delete_name = map_name.get(ws)
             // console.log(delete_name)
             //? 更新 is_active 为 false
             pool.query('UPDATE account SET is_active = ? WHERE username = ?', [false, delete_name], function (err, updateResult) {
