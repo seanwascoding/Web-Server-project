@@ -69,6 +69,7 @@ wss.on('connection', function connection(ws) {
                 ws.send("not work")
             }
         }
+        //! name pair
         else if (Object.keys(message_temp)[0] == '3') {
             let name_temp = message_temp['3']
             map_name.set(ws, name_temp)
@@ -103,7 +104,12 @@ wss.on('connection', function connection(ws) {
                 if (err) {
                     console.error('Error updating is_active: ', err);
                 }
-                console.log("is_active updated successfully");
+                else if (updateResult.length > 0) {
+                    console.log("is_active updated successfully");
+                }
+                else {
+                    console.log("no result found")
+                }
             });
         } catch (err) {
             console.log("error:", err)
