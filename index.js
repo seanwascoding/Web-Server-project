@@ -48,7 +48,7 @@ wss.on('connection', function connection(ws) {
                     else if (ws === keywords.get(client) && keywords.get(ws) === client) {
                         client.send(message_temp[Object.keys(message_temp)[0]])
                     }
-                    else if(keywords.get(ws) !=""){
+                    else if (keywords.get(ws) != "") {
                         //? jump
                     }
                     else {
@@ -219,7 +219,16 @@ app.post('/registe', (req, res) => {
 //* 設定儲存位置和檔名
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, './image/image')
+        const destinationPath = "image/" + req.headers['content-type']
+        fs.mkdir(destinationPath, { recursive: true }, function (err) {
+            if (err) {
+                // 创建目录失败，传递错误给回调函数
+                cb(err);
+            } else {
+                // 目录创建成功，指定存储路径
+                cb(null, destinationPath);
+            }
+        });
     },
     filename: function (req, file, cb) {
         cb(null, file.originalname)
@@ -237,12 +246,13 @@ const upload = multer({ storage: storage })
 const upload2 = multer({ storage: storage2 })
 
 //* Photo download
-app.post('/down', upload.single('image'), (req, res) => {
+app.post('/down', upload.array('image'), (req, res) => {
 
     console.log("Photo upload working")
     res.send("Photo upload working")
 
 });
+
 app.post('/down2', upload2.single('image'), (req, res) => {
 
     console.log("Photo upload working")

@@ -16,7 +16,9 @@ DESCRIBE account;
 
 USE test;
 SELECT * FROM account;
-/* UPDATE account SET is_active = false; */
+
+use test;
+UPDATE account SET is_active = false;
 
 
 INSERT INTO account (username, password)
