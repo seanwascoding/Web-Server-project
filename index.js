@@ -3,7 +3,8 @@ const multer = require('multer');
 const bodyParser = require('body-parser');
 const mysql = require('mysql2');
 const SocketServer = require('ws');
-const fs = require('fs')
+const fs = require('fs');
+const { randomUUID } = require('crypto');
 const app = express();
 
 /**  setup  */
@@ -62,13 +63,42 @@ wss.on('connection', function connection(ws) {
         //! send picture
         else if (Object.keys(message_temp)[0] == '2') {
             try {
-                photoData = fs.readFileSync('./image/image/test.png');
-                keywords.get(ws).send(photoData)
-                fs.unlinkSync('./image/image/test.png');
-                ws.send("sending work")
+                //? 傳送表單給客戶 => 傳送照片 => 核對照片
+                const path = message_temp['2']
+                fs.readdir(path, (err, files) => {
+                    if (err) {
+                        console.error('Error reading directory:', err);
+                        return;
+                    }
+                    console.log(files + ":" + files.length);
+
+                    //? send form (numbers of image)
+                    keywords.get(ws).send("times" + files.length)
+                    keywords.get(ws).send("filenames" + files)
+
+                    //? send data
+                    files.forEach((file) => {
+                        const filePath = path + "/" + file;
+                        const fileData = fs.readFileSync(filePath);
+                        keywords.get(ws).send(fileData)
+                    })
+
+                    //? Delete dir
+                    fs.rm(path, { recursive: true }, (err) => {
+                        if (err) {
+                            console.error('Error deleting directory:', err);
+                            return;
+                        }
+                        console.log('Directory deleted successfully.');
+                        ws.send('sending work');
+                    });
+                })
+
+                // fs.unlinkSync(path) 
+
             } catch (err) {
                 console.log(err)
-                fs.unlinkSync('./image/image/test.png');
+                fs.unlinkSync(message_temp['2']);
                 ws.send("not work")
             }
         }
@@ -217,15 +247,21 @@ app.post('/registe', (req, res) => {
 /** 上傳照片  */
 
 //* 設定儲存位置和檔名
+let test_test = true
+let destinationPath = null
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        const destinationPath = "image/" + req.headers['content-type']
+        if (test_test) {
+            destinationPath = "image/" + randomUUID()
+            test_test = false
+        }
+        else {
+            console.log("one more image")
+        }
         fs.mkdir(destinationPath, { recursive: true }, function (err) {
             if (err) {
-                // 创建目录失败，传递错误给回调函数
                 cb(err);
             } else {
-                // 目录创建成功，指定存储路径
                 cb(null, destinationPath);
             }
         });
@@ -249,8 +285,9 @@ const upload2 = multer({ storage: storage2 })
 app.post('/down', upload.array('image'), (req, res) => {
 
     console.log("Photo upload working")
-    res.send("Photo upload working")
-
+    res.send(destinationPath)
+    destinationPath = null
+    test_test = true
 });
 
 app.post('/down2', upload2.single('image'), (req, res) => {

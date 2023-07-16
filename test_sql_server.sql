@@ -18,7 +18,7 @@ USE test;
 SELECT * FROM account;
 
 use test;
-UPDATE account SET is_active = false;
+UPDATE account SET is_active = false where username = "sean";
 
 
 INSERT INTO account (username, password)
