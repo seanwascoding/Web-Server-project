@@ -93,9 +93,6 @@ wss.on('connection', function connection(ws) {
                         ws.send('sending work');
                     });
                 })
-
-                // fs.unlinkSync(path) 
-
             } catch (err) {
                 console.log(err)
                 fs.unlinkSync(message_temp['2']);
@@ -151,7 +148,7 @@ wss.on('connection', function connection(ws) {
     });
 })
 
-//* 解析json
+//* 解析file
 app.use(bodyParser.json());
 
 /**  帳號密碼  */
@@ -247,24 +244,34 @@ app.post('/registe', (req, res) => {
 /** 上傳照片  */
 
 //* 設定儲存位置和檔名
-let test_test = true
-let destinationPath = null
+let image_path = [] //line up
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        if (test_test) {
-            destinationPath = "image/" + randomUUID()
-            test_test = false
+        if (image_path.every(element => element.substring(element.length - 36, element.length) !== file.originalname.substring(0, 40 - 4)) || image_path.length < 1) {
+            // console.log(file.originalname.substring(0, 40 - 4))
+            const destinationPath = "image/" + randomUUID() + file.originalname.substring(0, 40 - 4)
+            image_path.push(destinationPath)
+            fs.mkdir(destinationPath, { recursive: true }, function (err) {
+                if (err) {
+                    cb(err);
+                } else {
+                    cb(null, destinationPath);
+                }
+            });
+            //! test output
+            // image_path.forEach((element, index) => {
+            //     console.log(element.substring(element.length - 36, element.length))
+            //     console.log(file.originalname.substring(0, 40 - 4))
+            // })
         }
         else {
-            console.log("one more image")
+            image_path.forEach((element, index) => {
+                if (file.originalname.substring(0, 40 - 4) == element.substring(element.length - 36, element.length)) {
+                    // console.log("one more image path:", element)
+                    cb(null, element)
+                }
+            })
         }
-        fs.mkdir(destinationPath, { recursive: true }, function (err) {
-            if (err) {
-                cb(err);
-            } else {
-                cb(null, destinationPath);
-            }
-        });
     },
     filename: function (req, file, cb) {
         cb(null, file.originalname)
@@ -281,13 +288,17 @@ const storage2 = multer.diskStorage({
 const upload = multer({ storage: storage })
 const upload2 = multer({ storage: storage2 })
 
+// app.use(bodyParser.urlencoded({ extended: true }));
+
 //* Photo download
 app.post('/down', upload.array('image'), (req, res) => {
 
-    console.log("Photo upload working")
-    res.send(destinationPath)
-    destinationPath = null
-    test_test = true
+    console.log("Photo upload working", req.files[0].destination)
+    res.send(req.files[0].destination)
+
+    //! send data to matlab
+
+
 });
 
 app.post('/down2', upload2.single('image'), (req, res) => {
@@ -361,7 +372,6 @@ function catch_signal(name) {
 
 //* identify connect matlab
 // const client = net.createConnection({ port: 65500 }, () => {
-//     // 連接成功
 //     console.log('Working to connect matlab');
 //     client.on('data', (data) => {
 //         console.log(`接收到 Matlab 數據：${data}`);
