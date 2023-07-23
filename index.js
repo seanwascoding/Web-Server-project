@@ -92,6 +92,11 @@ wss.on('connection', function connection(ws) {
                         console.log('Directory deleted successfully.');
                         ws.send('sending work');
                     });
+
+                    //? Delete image_path
+                    //TO DO
+
+
                 })
             } catch (err) {
                 console.log(err)
