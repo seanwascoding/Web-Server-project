@@ -4,6 +4,7 @@ const bodyParser = require('body-parser');
 const mysql = require('mysql2');
 const SocketServer = require('ws');
 const fs = require('fs');
+const net = require('net')
 const { randomUUID } = require('crypto');
 const app = express();
 
@@ -84,14 +85,14 @@ wss.on('connection', function connection(ws) {
                     })
 
                     //? Delete dir
-                    fs.rm(path, { recursive: true }, (err) => {
-                        if (err) {
-                            console.error('Error deleting directory:', err);
-                            return;
-                        }
-                        console.log('Directory deleted successfully.');
-                        ws.send('sending work');
-                    });
+                    // fs.rm(path, { recursive: true }, (err) => {
+                    //     if (err) {
+                    //         console.error('Error deleting directory:', err);
+                    //         return;
+                    //     }
+                    //     console.log('Directory deleted successfully.');
+                    //     ws.send('sending work');
+                    // });
 
                     //? Delete image_path
                     //TO DO
@@ -298,12 +299,28 @@ const upload2 = multer({ storage: storage2 })
 //* Photo download
 app.post('/down', upload.array('image'), (req, res) => {
 
-    console.log("Photo upload working", req.files[0].destination)
-    res.send(req.files[0].destination)
+    console.log("Photo upload working", req.files[0].destination, ":", req.files[0].filename, ":", req.files[1].filename)
+    let counter = 0
+    for (let i = 0; i < req.files.length; i++) {
+        //! send data to matlab
+        //? gave directory=>let matlab to calculate every image
+        //? gave filename=>send each filename to matalb & return signal
+        client.write((req.files[i].filename.length + req.files[i].destination.length + 1).toString())
+        client.write(req.files[i].destination + "/" + req.files[i].filename)
+        client.write('1')
+        //! catch signal from matalb
+        catch_signal(req.files[i].destination + "/" + req.files[i].filename)
+            .then(() => counter++)
+    }
 
-    //! send data to matlab
-
-
+    //! wait data complete
+    const timer = setInterval(function () {
+        if (counter == req.files.length) {
+            clearInterval(timer)
+            console.log("solve calculate")
+            res.send(req.files[0].destination)
+        }
+    }, 3000);
 });
 
 app.post('/down2', upload2.single('image'), (req, res) => {
@@ -316,7 +333,7 @@ app.post('/down2', upload2.single('image'), (req, res) => {
 /** 傳送命令  */
 
 //* Send state
-let filePath = "";
+let filePath = [];
 app.post('/state', async (req, res) => {
 
     //! data
@@ -362,34 +379,27 @@ app.post('/state2', async (req, res) => {
 //* catch signal
 function catch_signal(name) {
     return new Promise((resolve) => {
-        let timer = setInterval(function () {
-            if (filePath != "") {
+        const timer = setInterval(function () {
+            if (filePath.every(element => element == name) && filePath.length > 0) {
+                console.log(name)
                 clearInterval(timer)
-                console.log("catch_signal")
-                resolve(filePath + name + '.png')
+                const index_temp = filePath.indexOf(name)
+                filePath.splice(index_temp, 1) //? array.splice(start, deleteCount, item1, item2, ...);
+                console.log(name, "catch_signal")
+                resolve(null)
             }
             else {
-                console.log("等待中")
+                console.log(name, "等待中")
             }
         }, 1000);
     });
 }
 
 //* identify connect matlab
-// const client = net.createConnection({ port: 65500 }, () => {
-//     console.log('Working to connect matlab');
-//     client.on('data', (data) => {
-//         console.log(`接收到 Matlab 數據：${data}`);
-//         if (data == 1) {
-//             filePath = 'C:/Users/Sean/Desktop/vscode/project/image/gray/';
-//         } else if (data == 2) {
-//             filePath = 'C:/Users/Sean/Desktop/vscode/project/image/encryption/';
-//         } else if (data == 3) {
-//             filePath = 'C:/Users/Sean/Desktop/vscode/project/image/decrypt/';
-//         } else if (data == 4) {
-//             filePath = 'C:/Users/Sean/Desktop/vscode/project/image2/encryption/'
-//         } else if (data == 5) {
-//             filePath = 'C:/Users/Sean/Desktop/vscode/project/image2/decrypt/'
-//         }
-//     });
-// });
+const client = net.createConnection({ port: 65500 }, () => {
+    console.log('Working to connect matlab');
+    client.on('data', (data) => {
+        console.log(`接收到 Matlab 數據：${data}`);
+        filePath.push(data)
+    });
+});
