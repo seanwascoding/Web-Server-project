@@ -380,7 +380,8 @@ app.post('/state2', async (req, res) => {
 function catch_signal(name) {
     return new Promise((resolve) => {
         const timer = setInterval(function () {
-            if (filePath.every(element => element == name) && filePath.length > 0) {
+            if (filePath.some(element => element == name) && filePath.length > 0) {
+                console.log("complete:", filePath)
                 console.log(name)
                 clearInterval(timer)
                 const index_temp = filePath.indexOf(name)
@@ -389,6 +390,8 @@ function catch_signal(name) {
                 resolve(null)
             }
             else {
+                console.log("situation:", filePath)
+                // console.log("state:", filePath.some(element => element.toString() == name.toString()))
                 console.log(name, "等待中")
             }
         }, 1000);
@@ -399,7 +402,7 @@ function catch_signal(name) {
 const client = net.createConnection({ port: 65500 }, () => {
     console.log('Working to connect matlab');
     client.on('data', (data) => {
-        console.log(`接收到 Matlab 數據：${data}`);
-        filePath.push(data)
+        console.log(`Matlab data:${data}`);
+        filePath.push(data.toString())
     });
 });
