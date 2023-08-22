@@ -85,14 +85,14 @@ wss.on('connection', function connection(ws) {
                     })
 
                     //? Delete dir
-                    // fs.rm(path, { recursive: true }, (err) => {
-                    //     if (err) {
-                    //         console.error('Error deleting directory:', err);
-                    //         return;
-                    //     }
-                    //     console.log('Directory deleted successfully.');
-                    //     ws.send('sending work');
-                    // });
+                    fs.rm(path, { recursive: true }, (err) => {
+                        if (err) {
+                            console.error('Error deleting directory:', err);
+                            return;
+                        }
+                        console.log('Directory deleted successfully.');
+                        ws.send('sending work');
+                    });
 
                     //? Delete image_path
                     //TO DO
@@ -133,18 +133,19 @@ wss.on('connection', function connection(ws) {
 
         //?
         try {
+            //! TO DO => 
             const delete_name = map_name.get(ws)
             // console.log(delete_name)
             //? 更新 is_active 为 false
-            pool.query('UPDATE account SET is_active = ? WHERE username = ?', [false, delete_name], function (err, updateResult) {
+            pool.query('UPDATE account SET is_active = ? WHERE BINARY username = ?', [false, delete_name], function (err, updateResult) {
                 if (err) {
                     console.error('Error updating is_active: ', err);
                 }
-                else if (updateResult.length > 0) {
+                else if (updateResult.affectedRows > 0) {
                     console.log("is_active updated successfully");
                 }
                 else {
-                    console.log("no result found")
+                    console.log(updateResult.affectedRows, ":no result found")
                 }
             });
         } catch (err) {
@@ -154,7 +155,7 @@ wss.on('connection', function connection(ws) {
     });
 })
 
-//* 解析file
+//* 解析請求內容(解碼)
 app.use(bodyParser.json());
 
 /**  帳號密碼  */
@@ -173,7 +174,7 @@ app.post('/login', (req, res) => {
     const name = Object.keys(req.body)[0]
     const password = req.body[name]
     //! 先檢查使用者名稱是否已存在
-    pool.query('SELECT * FROM account WHERE username = ? AND password = ? AND is_active = ?', [name, password, false], function (err, results) {
+    pool.query('SELECT * FROM account WHERE BINARY username = ? AND BINARY password = ? AND is_active = ?', [name, password, false], function (err, results) {
         if (err) {
             console.error('Error executing query: ', err);
             res.send('Error checking username');
@@ -184,7 +185,7 @@ app.post('/login', (req, res) => {
 
             console.log("login successfully");
             //? 更新 is_active 为 true
-            pool.query('UPDATE account SET is_active = ? WHERE username = ?', [true, name], function (err, updateResult) {
+            pool.query('UPDATE account SET is_active = ? WHERE BINARY username = ?', [true, name], function (err, updateResult) {
                 if (err) {
                     console.error('Error updating is_active: ', err);
                     res.send('Error updating is_active');
@@ -210,7 +211,7 @@ app.post('/registe', (req, res) => {
     const name = Object.keys(req.body)[0]
     const password = req.body[name]
     //! 先檢查使用者名稱是否已存在
-    pool.query('SELECT * FROM account WHERE username = ?', [name], function (err, results) {
+    pool.query('SELECT * FROM account WHERE BINARY username = ?', [name], function (err, results) {
         if (err) {
             console.error('Error executing query: ', err);
             res.send('Error checking username');
@@ -294,12 +295,11 @@ const storage2 = multer.diskStorage({
 const upload = multer({ storage: storage })
 const upload2 = multer({ storage: storage2 })
 
-// app.use(bodyParser.urlencoded({ extended: true }));
-
 //* Photo download
 app.post('/down', upload.array('image'), (req, res) => {
 
-    console.log("Photo upload working", req.files[0].destination, ":", req.files[0].filename, ":", req.files[1].filename)
+    console.log("Photo upload working")
+    // console.log("Photo upload working", req.files[0].destination, ":", req.files[0].filename, ":", req.files[1].filename)
     let counter = 0
     for (let i = 0; i < req.files.length; i++) {
         //! send data to matlab
