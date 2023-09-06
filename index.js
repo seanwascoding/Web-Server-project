@@ -6,6 +6,7 @@ const SocketServer = require('ws');
 const fs = require('fs');
 const net = require('net')
 const { randomUUID } = require('crypto');
+const path = require('path')
 const app = express();
 
 /**  setup  */
@@ -164,7 +165,7 @@ app.use(bodyParser.json());
 const pool = mysql.createPool({
     host: 'localhost',
     user: 'root',
-    password: 'Amks94884674?',
+    password: '????',
     database: 'test'
 });
 
@@ -305,12 +306,16 @@ app.post('/down', upload.array('image'), (req, res) => {
         //! send data to matlab
         //? gave directory=>let matlab to calculate every image
         //? gave filename=>send each filename to matalb & return signal
-        client.write((req.files[i].filename.length + req.files[i].destination.length + 1).toString())
-        client.write(req.files[i].destination + "/" + req.files[i].filename)
+        let files_dir = path.join(__dirname, req.files[i].destination, req.files[i].filename)
+        let files_length = files_dir.length
+        console.log(files_dir, ":", files_length)
+        client.write(files_length.toString())
+        client.write(files_dir)
         client.write('1')
         //! catch signal from matalb
-        catch_signal(req.files[i].destination + "/" + req.files[i].filename)
+        catch_signal(files_dir)
             .then(() => counter++)
+        // .catch(()=> )
     }
 
     //! wait data complete
@@ -318,7 +323,7 @@ app.post('/down', upload.array('image'), (req, res) => {
         if (counter == req.files.length) {
             clearInterval(timer)
             console.log("solve calculate")
-            res.send(req.files[0].destination)
+            res.send(path.join(__dirname, req.files[0].destination))
         }
     }, 3000);
 });
@@ -390,7 +395,7 @@ function catch_signal(name) {
                 resolve(null)
             }
             else {
-                console.log("situation:", filePath)
+                console.log("complete photo array:", filePath)
                 // console.log("state:", filePath.some(element => element.toString() == name.toString()))
                 console.log(name, "等待中")
             }
