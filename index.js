@@ -53,6 +53,7 @@ wss.on('connection', function connection(ws) {
                     }
                     else if (keywords.get(ws) != "") {
                         //? jump
+                        //todo add return to interupt
                     }
                     else {
                         ws.send("error keywords")
@@ -86,17 +87,18 @@ wss.on('connection', function connection(ws) {
                     })
 
                     //? Delete dir
-                    fs.rm(path, { recursive: true }, (err) => {
-                        if (err) {
-                            console.error('Error deleting directory:', err);
-                            return;
-                        }
-                        console.log('Directory deleted successfully.');
-                        ws.send('sending work');
-                    });
+                    //TODO  
+                    // fs.rm(path, { recursive: true }, (err) => {
+                    //     if (err) {
+                    //         console.error('Error deleting directory:', err);
+                    //         return;
+                    //     }
+                    //     console.log('Directory deleted successfully.');
+                    //     ws.send('sending work');
+                    // });
 
                     //? Delete image_path
-                    //TO DO
+                    //TODO
 
 
                 })
@@ -107,6 +109,7 @@ wss.on('connection', function connection(ws) {
             }
         }
         //! name pair
+        //TODO delete this feature => correct to decryption feature
         else if (Object.keys(message_temp)[0] == '3') {
             let name_temp = message_temp['3']
             map_name.set(ws, name_temp)
@@ -165,7 +168,7 @@ app.use(bodyParser.json());
 const pool = mysql.createPool({
     host: 'localhost',
     user: 'root',
-    password: '????',
+    password: 'Amks94884674?',
     database: 'test'
 });
 
@@ -207,7 +210,7 @@ app.post('/login', (req, res) => {
 });
 
 //* registe
-app.post('/registe', (req, res) => {
+app.post('/register', (req, res) => {
     console.log(req.body)
     const name = Object.keys(req.body)[0]
     const password = req.body[name]
@@ -285,22 +288,12 @@ const storage = multer.diskStorage({
         cb(null, file.originalname)
     }
 });
-const storage2 = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, './image2/image')
-    },
-    filename: function (req, file, cb) {
-        cb(null, file.originalname)
-    }
-});
 const upload = multer({ storage: storage })
-const upload2 = multer({ storage: storage2 })
 
 //* Photo download
 app.post('/down', upload.array('image'), (req, res) => {
 
     console.log("Photo upload working")
-    // console.log("Photo upload working", req.files[0].destination, ":", req.files[0].filename, ":", req.files[1].filename)
     let counter = 0
     for (let i = 0; i < req.files.length; i++) {
         //! send data to matlab
@@ -328,60 +321,40 @@ app.post('/down', upload.array('image'), (req, res) => {
     }, 3000);
 });
 
-app.post('/down2', upload2.single('image'), (req, res) => {
+//* Photo Decryption
+app.post('/decrytion', upload.array('image'), (req, res) => {
 
-    console.log("Photo upload working")
-    res.send("Photo upload working")
+    console.log("Photo Decryption working")
+    let counter = 0
+    for (let i = 0; i < req.files.length; i++) {
+        //! send data to matlab
+        //? gave directory=>let matlab to calculate every image
+        //? gave filename=>send each filename to matalb & return signal
+        let files_dir = path.join(__dirname, req.files[i].destination, req.files[i].filename)
+        let files_length = files_dir.length
+        console.log(files_dir, ":", files_length)
+        client.write(files_length.toString())
+        client.write(files_dir)
+        client.write('2')
+        //! catch signal from matalb
+        catch_signal(files_dir)
+            .then(() => counter++)
+    }
 
+    //! wait data complete
+    const timer = setInterval(function () {
+        if (counter == req.files.length) {
+            clearInterval(timer)
+            console.log("solve calculate")
+            res.send(path.join(__dirname, req.files[0].destination, 'test'))
+        }
+    }, 3000);
 });
 
 /** 傳送命令  */
 
-//* Send state
-let filePath = [];
-app.post('/state', async (req, res) => {
-
-    //! data
-    const key = Object.keys(req.body)[0]
-    const state = req.body[key]
-    const key_length = key.length
-
-    //! output
-    //console.log("來自手機的訊號:", "name:" + key,"action:" + state, "name_length:" + key_length);
-
-    client.write(`${key_length}`);
-    client.write(`${key}`);
-    client.write(`${state}`);
-
-    //! wait data
-    //send data to android
-    catch_signal(key)
-        .then((result) => res.sendFile(result))
-        .then(() => filePath = "")
-
-});
-
-//* state 2
-app.post('/state2', async (req, res) => {
-
-    console.log(req.body)
-
-    //! data
-    const key = Object.keys(req.body)[0]
-    const state = req.body[key]
-    const key_length = key.length
-
-    client.write(`${key_length}`);
-    client.write(`${key}`);
-    client.write(`${state}`);
-
-    catch_signal(key)
-        .then((result) => res.sendFile(result))
-        .then(() => filePath = "")
-
-});
-
 //* catch signal
+let filePath = [];
 function catch_signal(name) {
     return new Promise((resolve) => {
         const timer = setInterval(function () {
@@ -396,7 +369,6 @@ function catch_signal(name) {
             }
             else {
                 console.log("complete photo array:", filePath)
-                // console.log("state:", filePath.some(element => element.toString() == name.toString()))
                 console.log(name, "等待中")
             }
         }, 1000);
@@ -404,10 +376,10 @@ function catch_signal(name) {
 }
 
 //* identify connect matlab
-const client = net.createConnection({ port: 65500 }, () => {
-    console.log('Working to connect matlab');
-    client.on('data', (data) => {
-        console.log(`Matlab data:${data}`);
-        filePath.push(data.toString())
-    });
-});
+// const client = net.createConnection({ port: 65502 }, () => {
+//     console.log('Working to connect matlab');
+//     client.on('data', (data) => {
+//         console.log(`Matlab data:${data}`);
+//         filePath.push(data.toString())
+//     });
+// });
