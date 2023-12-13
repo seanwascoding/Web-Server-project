@@ -116,6 +116,51 @@ wss.on('connection', function connection(ws) {
             console.log(map_name.size)
             ws.send("working to send name")
         }
+        //! name pair
+        else if (Object.keys(message_temp)[0] == '4') {
+            try {
+                //? 傳送表單給客戶 => 傳送照片 => 核對照片
+                const path = message_temp['4']
+                fs.readdir(path, (err, files) => {
+                    if (err) {
+                        console.error('Error reading directory:', err);
+                        return;
+                    }
+                    console.log(files + ":" + files.length);
+
+                    //? send form (numbers of image)
+                    ws.send("times" + files.length)
+                    ws.send("filenames" + files)
+
+                    //? send data
+                    files.forEach((file) => {
+                        const filePath = path + "/" + file;
+                        const fileData = fs.readFileSync(filePath);
+                        ws.send(fileData)
+                    })
+
+                    //? Delete dir
+                    //TODO  
+                    // fs.rm(path, { recursive: true }, (err) => {
+                    //     if (err) {
+                    //         console.error('Error deleting directory:', err);
+                    //         return;
+                    //     }
+                    //     console.log('Directory deleted successfully.');
+                    //     ws.send('sending work');
+                    // });
+
+                    //? Delete image_path
+                    //TODO
+
+
+                })
+            } catch (err) {
+                console.log(err)
+                fs.unlinkSync(message_temp['2']);
+                ws.send("not work")
+            }
+        }
         //! exception
         else {
             console.log("connect fail")
@@ -346,7 +391,7 @@ app.post('/decrytion', upload.array('image'), (req, res) => {
         if (counter == req.files.length) {
             clearInterval(timer)
             console.log("solve calculate")
-            res.send(path.join(__dirname, req.files[0].destination, 'test'))
+            res.send(path.join(__dirname, req.files[0].destination))
         }
     }, 3000);
 });
@@ -376,10 +421,10 @@ function catch_signal(name) {
 }
 
 //* identify connect matlab
-// const client = net.createConnection({ port: 65502 }, () => {
-//     console.log('Working to connect matlab');
-//     client.on('data', (data) => {
-//         console.log(`Matlab data:${data}`);
-//         filePath.push(data.toString())
-//     });
-// });
+const client = net.createConnection({ port: 65502 }, () => {
+    console.log('Working to connect matlab');
+    client.on('data', (data) => {
+        console.log(`Matlab data:${data}`);
+        filePath.push(data.toString())
+    });
+});
